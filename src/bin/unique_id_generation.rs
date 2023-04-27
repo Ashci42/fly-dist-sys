@@ -5,15 +5,15 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 enum MessageType {
-    Echo(EchoMessageBody),
-    EchoOk(EchoMessageBody),
+    Generate,
+    GenerateOk(GenerateOkMessageBody),
     Init(InitMessageBody),
     InitOk,
 }
 
 #[derive(Deserialize, Serialize)]
-struct EchoMessageBody {
-    echo: String,
+struct GenerateOkMessageBody {
+    id: String,
 }
 
 struct Node {
@@ -24,8 +24,10 @@ struct Node {
 impl MaelstromNodoe<MessageType> for Node {
     fn create_reply_message_type(&mut self, message_type: MessageType) -> MessageType {
         match message_type {
-            MessageType::Echo(echo) => MessageType::EchoOk(EchoMessageBody { echo: echo.echo }),
-            MessageType::EchoOk(_) => panic!("Should not receive echo_ok message"),
+            MessageType::Generate => MessageType::GenerateOk(GenerateOkMessageBody {
+                id: format!("{}-{}", self.name.as_ref().unwrap(), self.msg_id),
+            }),
+            MessageType::GenerateOk(_) => panic!("Should not receive generate_ok message"),
             MessageType::Init(init) => {
                 self.name = Some(init.node_id);
 

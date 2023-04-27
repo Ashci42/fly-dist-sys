@@ -1,8 +1,11 @@
 use std::io::{self, BufRead, Write};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-pub trait MaelstromNodoe<T> where T: DeserializeOwned + Serialize {
+pub trait MaelstromNodoe<T>
+where
+    T: DeserializeOwned + Serialize,
+{
     fn create_reply_message_type(&mut self, message_type: T) -> T;
     fn get_next_msg_id(&mut self) -> u32;
     fn get_node_name(&self) -> &Option<String>;
