@@ -22,14 +22,19 @@ struct Node {
 }
 
 impl MaelstromNodoe<MessageType> for Node {
-    fn create_reply_message_type(&mut self, message_type: MessageType) -> MessageType {
+    fn create_reply_message_type(
+        &mut self,
+        message_type: MessageType,
+    ) -> anyhow::Result<Option<MessageType>> {
         match message_type {
-            MessageType::Echo(echo) => MessageType::EchoOk(EchoMessageBody { echo: echo.echo }),
+            MessageType::Echo(echo) => Ok(Some(MessageType::EchoOk(EchoMessageBody {
+                echo: echo.echo,
+            }))),
             MessageType::EchoOk(_) => panic!("Should not receive echo_ok message"),
             MessageType::Init(init) => {
                 self.name = Some(init.node_id);
 
-                MessageType::InitOk
+                Ok(Some(MessageType::InitOk))
             }
             MessageType::InitOk => panic!("Should not receive init_ok message"),
         }

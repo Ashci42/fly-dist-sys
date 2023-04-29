@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use maelstrom::{InitMessageBody, MaelstromNodoe};
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,7 @@ enum MessageType {
     BroadcastOk,
     Init(InitMessageBody),
     InitOk,
+    NeighbourBroadcast(BroadcastMessageBody),
     Read,
     ReadOk(ReadOkMessageBody),
     Topology(TopologyMessageBody),
@@ -23,9 +24,26 @@ struct BroadcastMessageBody {
 }
 
 struct Node {
-    messages: Vec<i32>,
+    messages: HashSet<i32>,
     msg_id: u32,
+    neighbours: Vec<String>,
     name: Option<String>,
+}
+
+impl Node {
+    fn broadcast(&mut self, message: i32) -> anyhow::Result<()> {
+        if self.messages.insert(message) {
+            for neighbour in self.neighbours.clone() {
+                self.send_message(
+                    neighbour,
+                    None,
+                    MessageType::NeighbourBroadcast(BroadcastMessageBody { message }),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl MaelstromNodoe<MessageType> for Node {
@@ -35,7 +53,7 @@ impl MaelstromNodoe<MessageType> for Node {
     ) -> anyhow::Result<Option<MessageType>> {
         match message_type {
             MessageType::Broadcast(broadcast) => {
-                self.messages.push(broadcast.message);
+                self.broadcast(broadcast.message)?;
 
                 Ok(Some(MessageType::BroadcastOk))
             }
@@ -46,11 +64,23 @@ impl MaelstromNodoe<MessageType> for Node {
                 Ok(Some(MessageType::InitOk))
             }
             MessageType::InitOk => panic!("Should not receive init_ok message"),
+            MessageType::NeighbourBroadcast(broadcast) => {
+                self.broadcast(broadcast.message)?;
+
+                Ok(None)
+            }
             MessageType::Read => Ok(Some(MessageType::ReadOk(ReadOkMessageBody {
                 messages: self.messages.clone(),
             }))),
             MessageType::ReadOk(_) => panic!("Should not receive read_ok message"),
-            MessageType::Topology(_) => Ok(Some(MessageType::TopologyOk)),
+            MessageType::Topology(mut topology) => {
+                self.neighbours = topology
+                    .topology
+                    .remove(self.name.as_ref().unwrap())
+                    .unwrap();
+
+                Ok(Some(MessageType::TopologyOk))
+            }
             MessageType::TopologyOk => todo!(),
         }
     }
@@ -68,7 +98,7 @@ impl MaelstromNodoe<MessageType> for Node {
 
 #[derive(Deserialize, Serialize)]
 struct ReadOkMessageBody {
-    messages: Vec<i32>,
+    messages: HashSet<i32>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -78,8 +108,9 @@ struct TopologyMessageBody {
 
 fn main() -> anyhow::Result<()> {
     let mut node = Node {
-        messages: Vec::new(),
+        messages: HashSet::new(),
         msg_id: 0,
+        neighbours: Vec::new(),
         name: None,
     };
     node.start()?;
